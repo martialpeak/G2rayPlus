@@ -24,4 +24,4 @@
 کافیست دستور زیر را با دسترسی روت (`sudo su`) در ترمینال سرور خود کپی و اجرا کنید. اسکریپت تمام پیش‌نیازها را نصب کرده و ربات را ران می‌کند:
 
 ```bash
-bash <(curl -Ls [https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh](https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh))
+bash <(curl -Ls [https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh])
