@@ -1,1 +1,27 @@
-bash <(curl -Ls https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh)
+# 🚀 G2rayPlus - GitHub Codespaces Auto-Monitor
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-Telegram%20%7C%20Bale-informational)
+
+**G2rayPlus** یک ربات و کنترل‌پنل قدرتمند برای مدیریت و مانیتورینگ خودکار سرورهای گیت‌هاب (Codespaces) است. این دستیار هوشمند به محض خاموش شدن سرور، آن را شناسایی کرده و مجدداً راه‌اندازی (Auto-Revive) می‌کند و گزارش‌ها را مستقیماً به تلگرام یا بله شما می‌فرستد.
+
+## ✨ ویژگی‌ها
+- 🟢 **احیای خودکار:** روشن کردن اتوماتیک سرورهای دان شده.
+- 📊 **داشبورد وضعیت:** مانیتورینگ لحظه‌ای وضعیت سرویس‌ها و منابع سرور.
+- 🔔 **هشدارهای آنی:** دریافت پیام در لحظه خاموش شدن یا خطای سرور.
+- 📜 **لاگ‌خوان زنده:** مشاهده لاگ‌های سرور بدون نیاز به SSH.
+- ⚡ **پشتیبانی دوگانه:** قابل اجرا برای ربات‌های تلگرام و پیام‌رسان بله.
+- 🛠 **نصب بسیار آسان:** راه‌اندازی کل سیستم تنها با یک خط کد.
+
+##  پیش‌نیازها
+- یک سرور لینوکسی (اوبونتو/دبیان) با دسترسی `root`
+- توکن ربات تلگرام (از `@BotFather`) یا بله
+- آیدی عددی اکانت تلگرام شما (Chat ID)
+- توکن گیت‌هاب (Classic Token با دسترسی‌های `codespace`)
+
+## 🚀 نصب سریع (نصب آسان)
+کافیست دستور زیر را با دسترسی روت (`sudo su`) در ترمینال سرور خود کپی و اجرا کنید. اسکریپت تمام پیش‌نیازها را نصب کرده و ربات را ران می‌کند:
+
+```bash
+bash <(curl -Ls [https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh](https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh))
