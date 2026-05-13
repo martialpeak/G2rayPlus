@@ -19,12 +19,13 @@ touch "$CONF_FILE"
 # ==========================================
 # 0. CLEANUP OLD CODES & PYTHON BOTS
 # ==========================================
-echo -e "${CYAN}[+] Checking for old versions and cleaning up...${NC}"
-systemctl stop g2ray-panel.service g2ray-telegram.service g2ray-bale.service 2>/dev/null || true
-systemctl disable g2ray-panel.service g2ray-telegram.service g2ray-bale.service 2>/dev/null || true
+systemctl stop g2ray-panel.service g2ray-telegram.service g2ray-bale.service g2ray-tg-bot.service g2ray-bale-bot.service 2>/dev/null || true
+systemctl disable g2ray-panel.service g2ray-telegram.service g2ray-bale.service g2ray-tg-bot.service g2ray-bale-bot.service 2>/dev/null || true
 rm -f /etc/systemd/system/g2ray-panel.service \
       /etc/systemd/system/g2ray-telegram.service \
       /etc/systemd/system/g2ray-bale.service \
+      /etc/systemd/system/g2ray-tg-bot.service \
+      /etc/systemd/system/g2ray-bale-bot.service \
       /etc/g2ray-monitor/bot.py \
       /opt/g2ray-bot/bot.py 2>/dev/null || true
 systemctl daemon-reload
@@ -37,9 +38,9 @@ if [[ "${BASH_SOURCE[0]}" != "/usr/local/bin/g2ray" ]]; then
     apt-get update -qq && apt-get install -y -qq curl jq iputils-ping
     cp "${BASH_SOURCE[0]}" /usr/local/bin/g2ray
     chmod +x /usr/local/bin/g2ray
-    echo -e "${GREEN}[✔] Installation successful!${NC}"
+    echo -e "${GREEN}[✔] Update successful!${NC}"
     echo -e "From now on, just type ${YELLOW}g2ray${NC} anywhere in your terminal."
-    sleep 3
+    sleep 2
     exec g2ray
 fi
 
@@ -93,6 +94,7 @@ menu_monitors() {
     echo -e "  ${YELLOW}1)${NC} ➕ Add New Monitor (Requires GitHub Token)"
     echo -e "  ${YELLOW}2)${NC} 🗑️ Remove a Monitor"
     echo -e "  ${YELLOW}3)${NC} 📋 List Active Monitors"
+    echo -e "  ${YELLOW}4)${NC} 🔌 Power Control (Start/Stop Server)"
     echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
     echo ""
     echo -n "  Select option: "
@@ -101,6 +103,7 @@ menu_monitors() {
         1) add_monitor ;;
         2) remove_monitor ;;
         3) list_monitors ;;
+        4) power_control ;;
         0) show_main_menu ;;
         *) menu_monitors ;;
     esac
@@ -196,14 +199,12 @@ add_monitor() {
     read -r INTERVAL
     [[ -z "$INTERVAL" ]] && INTERVAL=60
 
-    # Save Specific Monitor Env
     cat > "$CONF_DIR/${CS_NAME}.env" <<EOF
 GH_TOKEN="$GH_TOKEN"
 INTERVAL="$INTERVAL"
 EOF
     chmod 600 "$CONF_DIR/${CS_NAME}.env"
 
-    # Build the background worker script ONCE
     WORKER="/usr/local/bin/g2ray-worker.sh"
     cat > "$WORKER" << 'WORKEREOF'
 #!/bin/bash
@@ -212,7 +213,6 @@ set -euo pipefail
 CS_NAME="$1"
 LOG="/var/log/g2ray-monitor.log"
 
-# Load Variables
 source /etc/g2ray-monitor/global.conf
 source "/etc/g2ray-monitor/${CS_NAME}.env"
 
@@ -254,7 +254,6 @@ done
 WORKEREOF
     chmod +x "$WORKER"
 
-    # Create Service
     SVC="/etc/systemd/system/g2ray-${CS_NAME}.service"
     cat > "$SVC" << EOF
 [Unit]
@@ -307,6 +306,63 @@ remove_monitor() {
         echo -e "${GREEN}Removed successfully!${NC}"
     fi
     sleep 1; menu_monitors
+}
+
+power_control() {
+    clear
+    echo -e "${CYAN}--- 🔌 Power Control ---${NC}"
+    mapfile -t ENV_FILES < <(ls /etc/g2ray-monitor/*.env 2>/dev/null | grep -v 'global.conf' || true)
+    
+    if [[ ${#ENV_FILES[@]} -eq 0 ]]; then
+        echo -e "${YELLOW}No servers configured yet. Add a monitor first!${NC}"
+        sleep 2; menu_monitors; return
+    fi
+
+    echo ""
+    for i in "${!ENV_FILES[@]}"; do
+        NAME=$(basename "${ENV_FILES[$i]}" .env)
+        if systemctl is-active --quiet "g2ray-${NAME}.service"; then
+            STATUS="${GREEN}Monitor: ON${NC}"
+        else
+            STATUS="${RED}Monitor: OFF${NC}"
+        fi
+        echo -e "  $((i+1))) ${NAME} [${STATUS}]"
+    done
+    echo "  0) Cancel"
+    echo ""
+    echo -n "  Select server to control: "
+    read -r SEL
+
+    if [[ "$SEL" == "0" ]]; then menu_monitors; return; fi
+    if ! [[ "$SEL" =~ ^[0-9]+$ ]] || (( SEL < 1 || SEL > ${#ENV_FILES[@]} )); then
+        echo -e "${RED}Invalid selection.${NC}"; sleep 1; power_control; return
+    fi
+
+    TARGET_ENV="${ENV_FILES[$((SEL-1))]}"
+    CS_NAME=$(basename "$TARGET_ENV" .env)
+    
+    # Load the GH_TOKEN for this specific server
+    source "$TARGET_ENV"
+
+    echo -e "\n  ${CYAN}Action for $CS_NAME:${NC}"
+    echo -e "  ${YELLOW}1)${NC} ▶️ Start Server & Monitor"
+    echo -e "  ${YELLOW}2)${NC} 🛑 Stop Server & Monitor"
+    echo -e "  ${YELLOW}0)${NC} 🔙 Back"
+    echo -n "  Select action: "
+    read -r ACT
+
+    if [[ "$ACT" == "1" ]]; then
+        echo -e "  ${YELLOW}Starting server and monitor...${NC}"
+        curl -s -o /dev/null -X POST -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/user/codespaces/${CS_NAME}/start" || true
+        systemctl start "g2ray-${CS_NAME}.service" 2>/dev/null || true
+        echo -e "  ${GREEN}Server started!${NC}"
+    elif [[ "$ACT" == "2" ]]; then
+        echo -e "  ${YELLOW}Stopping monitor and server...${NC}"
+        systemctl stop "g2ray-${CS_NAME}.service" 2>/dev/null || true
+        curl -s -o /dev/null -X POST -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/user/codespaces/${CS_NAME}/stop" || true
+        echo -e "  ${GREEN}Server stopped!${NC}"
+    fi
+    sleep 2; power_control
 }
 
 purge_all() {
