@@ -11,6 +11,9 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# GitHub Project URL
+REPO_URL="https://github.com/martialpeak/G2rayPlus"
+
 CONF_DIR="/etc/g2ray-monitor"
 CONF_FILE="$CONF_DIR/global.conf"
 mkdir -p "$CONF_DIR"
@@ -62,6 +65,70 @@ EOF
     chmod 600 "$CONF_FILE"
 }
 load_config
+
+# ==========================================
+# 3. MENUS (Header with Project Link)
+# ==========================================
+draw_header() {
+    clear
+    echo -e "${CYAN}=================================================${NC}"
+    echo -e "${GREEN}    g2ray Central Manager (Codespaces)           ${NC}"
+    echo -e "${YELLOW}    URL: ${REPO_URL}${NC}"
+    echo -e "${CYAN}=================================================${NC}"
+}
+
+show_main_menu() {
+    draw_header
+    echo ""
+    echo -e "  ${YELLOW}1)${NC} 🖥️  Monitors Management"
+    echo -e "  ${YELLOW}2)${NC} ⚙️  Global Alerts & Cleanup"
+    echo -e "  ${YELLOW}3)${NC} 🛠️  Logs & Diagnostics"
+    echo -e "  ${YELLOW}0)${NC} ❌ Exit"
+    echo ""
+    echo -n "  Select option: "
+    read -r OPT
+    case $OPT in
+        1) menu_monitors ;;
+        2) menu_settings ;;
+        3) menu_diagnostics ;;
+        0) clear; exit 0 ;;
+        *) show_main_menu ;;
+    esac
+}
+
+menu_monitors() {
+    draw_header
+    echo -e "  --- 🖥️ Monitors Management ---"
+    echo ""
+    echo -e "  ${YELLOW}1)${NC} ➕ Add New Monitor (Requires GitHub Token)"
+    echo -e "  ${YELLOW}2)${NC} 🗑️ Remove a Monitor"
+    echo -e "  ${YELLOW}3)${NC} 📋 List Active Monitors"
+    echo -e "  ${YELLOW}4)${NC} 🔌 Power Control (Start/Stop Server)"
+    echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
+    echo ""
+    echo -n "  Select option: "
+    read -r OPT
+    case $OPT in
+        1) add_monitor ;;
+        2) remove_monitor ;;
+        3) list_monitors ;;
+        4) power_control ;;
+        0) show_main_menu ;;
+        *) menu_monitors ;;
+    esac
+}
+
+# ... (بقیه توابع add_monitor, remove_monitor, power_control ثابت می‌مانند) ...
+
+# تابع Diagnostics اصلاح شده با آدرس گیت‌هاب
+run_tests() {
+    echo -e "\n${CYAN}Running Diagnostics...${NC}"
+    echo -e "Project URL  : ${YELLOW}${REPO_URL}${NC}"
+    ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo -e "Internet     : ${GREEN}OK${NC}" || echo -e "Internet     : ${RED}Fail${NC}"
+    curl -s -m 3 https://api.telegram.org >/dev/null && echo -e "Telegram API : ${GREEN}Reachable${NC}" || echo -e "Telegram API : ${RED}Blocked${NC}"
+    curl -s -m 3 https://tapi.bale.ai >/dev/null && echo -e "Bale API     : ${GREEN}Reachable${NC}" || echo -e "Bale API     : ${RED}Blocked${NC}"
+}
+
 
 # ==========================================
 # 3. MENUS
