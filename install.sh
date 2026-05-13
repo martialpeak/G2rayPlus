@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# بررسی دسترسی روت
+# Check root privileges
 if [ "$EUID" -ne 0 ]; then
   echo -e "\e[31m[-] Please run this script as root! (sudo su)\e[0m"
   exit 1
@@ -18,22 +18,22 @@ cd /etc/g2ray-monitor
 echo -e "\e[34m[+]\e[0m Downloading g2ray bot..."
 wget -qO bot.py "https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/bot.py"
 
-# متوقف کردن سرویس‌های قدیمی (در صورت وجود)
+# Stop existing services if any
 systemctl stop g2ray-panel.service g2ray-telegram.service g2ray-bale.service 2>/dev/null
 
 echo -e "\n\e[36m=========================================\e[0m"
-echo -e "\e[33m[?]\e[0m پلتفرم مورد نظر برای اجرای ربات را انتخاب کنید:"
-echo -e "  1) تلگرام (Telegram) \e[32m[پیش‌فرض]\e[0m"
-echo -e "  2) بله (Bale)"
-echo -e "  3) هر دو (تلگرام + بله همزمان)"
-read -p "انتخاب شما (1, 2 یا 3): " platform_choice
+echo -e "\e[33m[?]\e[0m Select the platform to run the bot:"
+echo -e "  1) Telegram \e[32m[Default]\e[0m"
+echo -e "  2) Bale"
+echo -e "  3) Both (Telegram + Bale simultaneously)"
+read -p "Your choice (1, 2, or 3): " platform_choice
 
-# تابع نصب سرویس تلگرام
+# Setup Telegram Service
 setup_telegram() {
-    echo -e "\n\e[36m--- تنظیمات تلگرام ---\e[0m"
-    echo -e "\e[33m[?]\e[0m توکن ربات تلگرام خود را وارد کنید: "
+    echo -e "\n\e[36m--- Telegram Setup ---\e[0m"
+    echo -e "\e[33m[?]\e[0m Enter your Telegram Bot Token: "
     read -r tg_bot_token
-    echo -e "\e[33m[?]\e[0m آیدی عددی (Chat ID) تلگرام خود را وارد کنید: "
+    echo -e "\e[33m[?]\e[0m Enter your Telegram Admin Chat ID: "
     read -r tg_chat_id
     
     sed -i "s/YOUR_TG_TOKEN_HERE/$tg_bot_token/" bot.py
@@ -58,15 +58,15 @@ EOF
     systemctl daemon-reload
     systemctl enable g2ray-telegram.service
     systemctl start g2ray-telegram.service
-    echo -e "\e[32m[+] سرویس تلگرام با موفقیت فعال شد.\e[0m"
+    echo -e "\e[32m[+] Telegram service started successfully.\e[0m"
 }
 
-# تابع نصب سرویس بله
+# Setup Bale Service
 setup_bale() {
-    echo -e "\n\e[36m--- تنظیمات بله ---\e[0m"
-    echo -e "\e[33m[?]\e[0m توکن ربات بله خود را وارد کنید: "
+    echo -e "\n\e[36m--- Bale Setup ---\e[0m"
+    echo -e "\e[33m[?]\e[0m Enter your Bale Bot Token: "
     read -r bale_bot_token
-    echo -e "\e[33m[?]\e[0m آیدی عددی (Chat ID) بله خود را وارد کنید: "
+    echo -e "\e[33m[?]\e[0m Enter your Bale Admin Chat ID: "
     read -r bale_chat_id
     
     sed -i "s/YOUR_BALE_TOKEN_HERE/$bale_bot_token/" bot.py
@@ -91,19 +91,19 @@ EOF
     systemctl daemon-reload
     systemctl enable g2ray-bale.service
     systemctl start g2ray-bale.service
-    echo -e "\e[32m[+] سرویس بله با موفقیت فعال شد.\e[0m"
+    echo -e "\e[32m[+] Bale service started successfully.\e[0m"
 }
 
-# بررسی انتخاب کاربر و اجرای توابع
+# Execute based on user choice
 if [ "$platform_choice" == "2" ]; then
     setup_bale
 elif [ "$platform_choice" == "3" ]; then
     setup_telegram
     setup_bale
 else
-    # اگر 1 زد یا اینتر خالی زد (پیش‌فرض)
+    # Default to Telegram if 1 or empty
     setup_telegram
 fi
 
 echo -e "\n\e[32m[✔] Installation Successful!\e[0m"
-echo -e "ربات شما با موفقیت راه‌اندازی شد. اکنون می‌توانید به ربات پیام /start ارسال کنید."
+echo -e "The bot is now running. You can send /start in your bot."
