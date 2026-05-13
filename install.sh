@@ -14,6 +14,20 @@ NC='\033[0m'
 CONF_DIR="/etc/g2ray-monitor"
 CONF_FILE="$CONF_DIR/global.conf"
 mkdir -p "$CONF_DIR"
+touch "$CONF_FILE"
+
+# ==========================================
+# 0. CLEANUP OLD CODES & PYTHON BOTS
+# ==========================================
+echo -e "${CYAN}[+] Checking for old versions and cleaning up...${NC}"
+systemctl stop g2ray-panel.service g2ray-telegram.service g2ray-bale.service 2>/dev/null || true
+systemctl disable g2ray-panel.service g2ray-telegram.service g2ray-bale.service 2>/dev/null || true
+rm -f /etc/systemd/system/g2ray-panel.service \
+      /etc/systemd/system/g2ray-telegram.service \
+      /etc/systemd/system/g2ray-bale.service \
+      /etc/g2ray-monitor/bot.py \
+      /opt/g2ray-bot/bot.py 2>/dev/null || true
+systemctl daemon-reload
 
 # ==========================================
 # 1. AUTO-INSTALL GLOBAL COMMAND
@@ -30,16 +44,15 @@ if [[ "${BASH_SOURCE[0]}" != "/usr/local/bin/g2ray" ]]; then
 fi
 
 # ==========================================
-# 2. CONFIGURATION MANAGER
+# 2. GLOBAL SETTINGS (Only Telegram/Bale)
 # ==========================================
 load_config() {
-    GH_TOKEN=""; TG_BOT=""; TG_ID=""; BALE_BOT=""; BALE_ID=""
+    TG_BOT=""; TG_ID=""; BALE_BOT=""; BALE_ID=""
     if [[ -f "$CONF_FILE" ]]; then source "$CONF_FILE"; fi
 }
 
 save_config() {
     cat > "$CONF_FILE" <<EOF
-GH_TOKEN="$GH_TOKEN"
 TG_BOT="$TG_BOT"
 TG_ID="$TG_ID"
 BALE_BOT="$BALE_BOT"
@@ -59,7 +72,7 @@ show_main_menu() {
     echo -e "${CYAN}=================================================${NC}"
     echo ""
     echo -e "  ${YELLOW}1)${NC} 🖥️  Monitors Management"
-    echo -e "  ${YELLOW}2)${NC} ⚙️  Global Settings (Tokens & Alerts)"
+    echo -e "  ${YELLOW}2)${NC} ⚙️  Global Alerts & Cleanup"
     echo -e "  ${YELLOW}3)${NC} 🛠️  Logs & Diagnostics"
     echo -e "  ${YELLOW}0)${NC} ❌ Exit"
     echo ""
@@ -77,8 +90,8 @@ show_main_menu() {
 menu_monitors() {
     clear
     echo -e "${CYAN}--- 🖥️ Monitors Management ---${NC}"
-    echo -e "  ${YELLOW}1)${NC} ➕ Add New Monitor"
-    echo -e "  ${YELLOW}2)${NC} 🗑️ Remove Monitor"
+    echo -e "  ${YELLOW}1)${NC} ➕ Add New Monitor (Requires GitHub Token)"
+    echo -e "  ${YELLOW}2)${NC} 🗑️ Remove a Monitor"
     echo -e "  ${YELLOW}3)${NC} 📋 List Active Monitors"
     echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
     echo ""
@@ -95,30 +108,27 @@ menu_monitors() {
 
 menu_settings() {
     clear
-    echo -e "${CYAN}--- ⚙️ Global Settings ---${NC}"
-    echo -e "Current GitHub Token : $(if [[ -n "$GH_TOKEN" ]]; then echo -e "${GREEN}Set${NC}"; else echo -e "${RED}Not Set${NC}"; fi)"
+    echo -e "${CYAN}--- ⚙️ Global Alerts & Cleanup ---${NC}"
     echo -e "Current Telegram   : $(if [[ -n "$TG_BOT" ]]; then echo -e "${GREEN}Set${NC}"; else echo -e "${RED}Not Set${NC}"; fi)"
     echo -e "Current Bale       : $(if [[ -n "$BALE_BOT" ]]; then echo -e "${GREEN}Set${NC}"; else echo -e "${RED}Not Set${NC}"; fi)"
     echo ""
-    echo -e "  ${YELLOW}1)${NC} Set/Update GitHub Token"
-    echo -e "  ${YELLOW}2)${NC} Set/Update Telegram Alerts"
-    echo -e "  ${YELLOW}3)${NC} Set/Update Bale Alerts"
+    echo -e "  ${YELLOW}1)${NC} Set/Update Telegram Alerts"
+    echo -e "  ${YELLOW}2)${NC} Set/Update Bale Alerts"
+    echo -e "  ${YELLOW}3)${NC} 🧹 Deep Cleanup (Purge ALL monitors & codes)"
     echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
     echo ""
     echo -n "  Select option: "
     read -r OPT
     case $OPT in
         1) 
-            echo -n "Enter GitHub Token: "; read -r GH_TOKEN; 
-            save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
-        2) 
             echo -n "Enter Telegram Bot Token: "; read -r TG_BOT; 
             echo -n "Enter Telegram Chat ID: "; read -r TG_ID; 
             save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
-        3) 
+        2) 
             echo -n "Enter Bale Bot Token: "; read -r BALE_BOT; 
             echo -n "Enter Bale Chat ID: "; read -r BALE_ID; 
             save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
+        3)  purge_all ;;
         0) show_main_menu ;;
         *) menu_settings ;;
     esac
@@ -147,16 +157,26 @@ menu_diagnostics() {
 # 4. CORE FUNCTIONS
 # ==========================================
 add_monitor() {
-    if [[ -z "$GH_TOKEN" ]]; then
-        echo -e "\n${RED}[!] GitHub Token is not set! Please go to Global Settings first.${NC}"
-        sleep 2; menu_monitors; return
+    echo -e "\n${CYAN}--- GitHub Verification ---${NC}"
+    echo -n "  Paste GitHub Token for this codespace (hidden): "
+    read -sr GH_TOKEN
+    echo ""
+    GH_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
+    
+    if [[ -z "$GH_TOKEN" ]]; then echo -e "${RED}Token cannot be empty!${NC}"; sleep 2; menu_monitors; return; fi
+    
+    echo "  Verifying token..."
+    LOGIN=$(curl -s --max-time 10 -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user | jq -r '.login // empty' || true)
+    if [[ -z "$LOGIN" ]]; then
+        echo -e "${RED}  Invalid token or network error!${NC}"; sleep 2; menu_monitors; return
     fi
+    echo -e "  ${GREEN}Authorized as: $LOGIN${NC}"
 
-    echo -e "\n${CYAN}Fetching your codespaces...${NC}"
+    echo -e "\n${CYAN}Fetching codespaces...${NC}"
     mapfile -t CODESPACES < <(curl -s --max-time 10 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/user/codespaces | jq -r '.codespaces[].name // empty')
 
     if [[ ${#CODESPACES[@]} -eq 0 ]]; then
-        echo -e "${RED}No codespaces found or invalid token!${NC}"; sleep 2; menu_monitors; return
+        echo -e "${RED}No codespaces found for this token!${NC}"; sleep 2; menu_monitors; return
     fi
 
     echo ""
@@ -176,23 +196,37 @@ add_monitor() {
     read -r INTERVAL
     [[ -z "$INTERVAL" ]] && INTERVAL=60
 
+    # Save Specific Monitor Env
+    cat > "$CONF_DIR/${CS_NAME}.env" <<EOF
+GH_TOKEN="$GH_TOKEN"
+INTERVAL="$INTERVAL"
+EOF
+    chmod 600 "$CONF_DIR/${CS_NAME}.env"
+
     # Build the background worker script ONCE
     WORKER="/usr/local/bin/g2ray-worker.sh"
     cat > "$WORKER" << 'WORKEREOF'
 #!/bin/bash
 set -euo pipefail
-source /etc/g2ray-monitor/global.conf
 
 CS_NAME="$1"
-INTERVAL="$2"
 LOG="/var/log/g2ray-monitor.log"
+
+# Load Variables
+source /etc/g2ray-monitor/global.conf
+source "/etc/g2ray-monitor/${CS_NAME}.env"
+
+TG_BOT="${TG_BOT:-}"
+TG_ID="${TG_ID:-}"
+BALE_BOT="${BALE_BOT:-}"
+BALE_ID="${BALE_ID:-}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${CS_NAME}] $*" >> "$LOG"; }
 
 send_alert() {
     local msg="$1"
-    [[ -n "$TG_BOT" && -n "$TG_ID" ]] && curl -s -X POST "https://api.telegram.org/bot${TG_BOT}/sendMessage" -d chat_id="${TG_ID}" -d text="$msg" -d parse_mode="HTML" > /dev/null
-    [[ -n "$BALE_BOT" && -n "$BALE_ID" ]] && curl -s -X POST "https://tapi.bale.ai/bot${BALE_BOT}/sendMessage" -d chat_id="${BALE_ID}" -d text="$msg" -d parse_mode="HTML" > /dev/null
+    [[ -n "$TG_BOT" && -n "$TG_ID" ]] && curl -s --max-time 10 -X POST "https://api.telegram.org/bot${TG_BOT}/sendMessage" -d chat_id="${TG_ID}" -d text="$msg" -d parse_mode="HTML" > /dev/null || true
+    [[ -n "$BALE_BOT" && -n "$BALE_ID" ]] && curl -s --max-time 10 -X POST "https://tapi.bale.ai/bot${BALE_BOT}/sendMessage" -d chat_id="${BALE_ID}" -d text="$msg" -d parse_mode="HTML" > /dev/null || true
 }
 
 start_cs() {
@@ -210,7 +244,7 @@ start_cs() {
 
 log "Started monitoring ($INTERVAL s)"
 while true; do
-    state=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/user/codespaces/${CS_NAME}" | jq -r '.state // empty' || true)
+    state=$(curl -s --max-time 10 -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/user/codespaces/${CS_NAME}" | jq -r '.state // empty' || true)
     case "$state" in
         Available) log "OK" ;;
         Shutdown|Stopped) start_cs ;;
@@ -230,7 +264,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=$WORKER ${CS_NAME} ${INTERVAL}
+ExecStart=$WORKER ${CS_NAME}
 Restart=always
 RestartSec=10
 
@@ -264,19 +298,44 @@ remove_monitor() {
     if [[ "$SEL" == "0" ]]; then menu_monitors; return; fi
     if [[ "$SEL" =~ ^[0-9]+$ ]] && (( SEL > 0 && SEL <= ${#SERVICES[@]} )); then
         SVC="${SERVICES[$((SEL-1))]}"
+        TARGET_ENV=$(echo "$SVC" | sed 's/g2ray-//' | sed 's/\.service//')
+        
         systemctl disable --now "$SVC" 2>/dev/null || true
         rm -f "/etc/systemd/system/$SVC"
+        rm -f "$CONF_DIR/${TARGET_ENV}.env"
         systemctl daemon-reload
         echo -e "${GREEN}Removed successfully!${NC}"
     fi
     sleep 1; menu_monitors
 }
 
+purge_all() {
+    echo -e "\n${RED}⚠️ WARNING: This will STOP and DELETE all monitors, tokens, and settings!${NC}"
+    echo -n "Are you absolutely sure? (type 'yes' to confirm): "
+    read -r CONFIRM
+    if [[ "$CONFIRM" == "yes" ]]; then
+        echo -e "${YELLOW}Purging system...${NC}"
+        mapfile -t SERVICES < <(ls /etc/systemd/system/ | grep -E '^g2ray-.*\.service$' || true)
+        for SVC in "${SERVICES[@]:-}"; do
+            systemctl disable --now "$SVC" 2>/dev/null || true
+            rm -f "/etc/systemd/system/$SVC"
+        done
+        rm -rf /etc/g2ray-monitor/*
+        systemctl daemon-reload
+        echo -e "${GREEN}System completely purged!${NC}"
+        sleep 2
+        show_main_menu
+    else
+        echo -e "${GREEN}Aborted.${NC}"
+        sleep 1; menu_settings
+    fi
+}
+
 run_tests() {
     echo -e "\n${CYAN}Running Diagnostics...${NC}"
     ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo -e "Internet: ${GREEN}OK${NC}" || echo -e "Internet: ${RED}Fail${NC}"
-    [[ -n "$GH_TOKEN" ]] && echo -e "GitHub Auth: ${GREEN}Ready${NC}" || echo -e "GitHub Auth: ${RED}Missing${NC}"
     curl -s -m 3 https://api.telegram.org >/dev/null && echo -e "Telegram API: ${GREEN}Reachable${NC}" || echo -e "Telegram API: ${RED}Blocked${NC}"
+    curl -s -m 3 https://tapi.bale.ai >/dev/null && echo -e "Bale API: ${GREEN}Reachable${NC}" || echo -e "Bale API: ${RED}Blocked${NC}"
 }
 
 # START APP
