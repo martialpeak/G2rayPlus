@@ -16,22 +16,32 @@ mkdir -p /etc/g2ray-monitor
 cd /etc/g2ray-monitor
 
 echo -e "\e[34m[+]\e[0m Downloading g2ray bot..."
-# حتما لینک زیر را با لینک RAW فایل bot.py در گیت‌هاب خودتان عوض کنید:
 wget -qO bot.py "https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/bot.py"
 
-echo -e "\e[33m[?]\e[0m Enter your Telegram Bot Token (from @BotFather): "
-read -r user_bot_token
-echo -e "\e[33m[?]\e[0m Enter your Telegram Admin Chat ID: "
-read -r user_chat_id
+# متوقف کردن سرویس‌های قدیمی (در صورت وجود)
+systemctl stop g2ray-panel.service g2ray-telegram.service g2ray-bale.service 2>/dev/null
 
-echo -e "\e[34m[+]\e[0m Applying your configuration..."
-sed -i "s/YOUR_TG_TOKEN_HERE/$user_bot_token/" bot.py
-sed -i "s/YOUR_TG_CHAT_ID_HERE/$user_chat_id/" bot.py
+echo -e "\n\e[36m=========================================\e[0m"
+echo -e "\e[33m[?]\e[0m پلتفرم مورد نظر برای اجرای ربات را انتخاب کنید:"
+echo -e "  1) تلگرام (Telegram) \e[32m[پیش‌فرض]\e[0m"
+echo -e "  2) بله (Bale)"
+echo -e "  3) هر دو (تلگرام + بله همزمان)"
+read -p "انتخاب شما (1, 2 یا 3): " platform_choice
 
-echo -e "\e[34m[+]\e[0m Creating Systemd background service..."
-cat <<EOF > /etc/systemd/system/g2ray-panel.service
+# تابع نصب سرویس تلگرام
+setup_telegram() {
+    echo -e "\n\e[36m--- تنظیمات تلگرام ---\e[0m"
+    echo -e "\e[33m[?]\e[0m توکن ربات تلگرام خود را وارد کنید: "
+    read -r tg_bot_token
+    echo -e "\e[33m[?]\e[0m آیدی عددی (Chat ID) تلگرام خود را وارد کنید: "
+    read -r tg_chat_id
+    
+    sed -i "s/YOUR_TG_TOKEN_HERE/$tg_bot_token/" bot.py
+    sed -i "s/YOUR_TG_CHAT_ID_HERE/$tg_chat_id/" bot.py
+
+    cat <<EOF > /etc/systemd/system/g2ray-telegram.service
 [Unit]
-Description=g2ray Telegram Bot Panel
+Description=g2ray Bot Panel (Telegram)
 After=network.target
 
 [Service]
@@ -45,11 +55,55 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
+    systemctl daemon-reload
+    systemctl enable g2ray-telegram.service
+    systemctl start g2ray-telegram.service
+    echo -e "\e[32m[+] سرویس تلگرام با موفقیت فعال شد.\e[0m"
+}
 
-echo -e "\e[34m[+]\e[0m Starting the bot service..."
-systemctl daemon-reload
-systemctl enable g2ray-panel.service
-systemctl start g2ray-panel.service
+# تابع نصب سرویس بله
+setup_bale() {
+    echo -e "\n\e[36m--- تنظیمات بله ---\e[0m"
+    echo -e "\e[33m[?]\e[0m توکن ربات بله خود را وارد کنید: "
+    read -r bale_bot_token
+    echo -e "\e[33m[?]\e[0m آیدی عددی (Chat ID) بله خود را وارد کنید: "
+    read -r bale_chat_id
+    
+    sed -i "s/YOUR_BALE_TOKEN_HERE/$bale_bot_token/" bot.py
+    sed -i "s/YOUR_BALE_CHAT_ID_HERE/$bale_chat_id/" bot.py
 
-echo -e "\e[32m[✔] Installation Successful!\e[0m"
-echo -e "You can now go to your Telegram bot and send /start"
+    cat <<EOF > /etc/systemd/system/g2ray-bale.service
+[Unit]
+Description=g2ray Bot Panel (Bale)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/g2ray-monitor
+ExecStart=/usr/bin/python3 /etc/g2ray-monitor/bot.py bale
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable g2ray-bale.service
+    systemctl start g2ray-bale.service
+    echo -e "\e[32m[+] سرویس بله با موفقیت فعال شد.\e[0m"
+}
+
+# بررسی انتخاب کاربر و اجرای توابع
+if [ "$platform_choice" == "2" ]; then
+    setup_bale
+elif [ "$platform_choice" == "3" ]; then
+    setup_telegram
+    setup_bale
+else
+    # اگر 1 زد یا اینتر خالی زد (پیش‌فرض)
+    setup_telegram
+fi
+
+echo -e "\n\e[32m[✔] Installation Successful!\e[0m"
+echo -e "ربات شما با موفقیت راه‌اندازی شد. اکنون می‌توانید به ربات پیام /start ارسال کنید."
