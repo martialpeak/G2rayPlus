@@ -11,395 +11,273 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+CONF_DIR="/etc/g2ray-monitor"
+CONF_FILE="$CONF_DIR/global.conf"
+mkdir -p "$CONF_DIR"
+
+# ==========================================
+# 1. AUTO-INSTALL GLOBAL COMMAND
+# ==========================================
 if [[ "${BASH_SOURCE[0]}" != "/usr/local/bin/g2ray" ]]; then
-    echo -e "${CYAN}Installing 'g2ray' globally...${NC}"
+    echo -e "${CYAN}[+] Installing 'g2ray' core to system...${NC}"
+    apt-get update -qq && apt-get install -y -qq curl jq iputils-ping
     cp "${BASH_SOURCE[0]}" /usr/local/bin/g2ray
     chmod +x /usr/local/bin/g2ray
-    echo -e "${GREEN}Installation successful!${NC}"
-    echo -e "From now on, just type ${CYAN}g2ray${NC} in the terminal to open this manager."
+    echo -e "${GREEN}[✔] Installation successful!${NC}"
+    echo -e "From now on, just type ${YELLOW}g2ray${NC} anywhere in your terminal."
     sleep 3
     exec g2ray
 fi
 
-show_menu() {
+# ==========================================
+# 2. CONFIGURATION MANAGER
+# ==========================================
+load_config() {
+    GH_TOKEN=""; TG_BOT=""; TG_ID=""; BALE_BOT=""; BALE_ID=""
+    if [[ -f "$CONF_FILE" ]]; then source "$CONF_FILE"; fi
+}
+
+save_config() {
+    cat > "$CONF_FILE" <<EOF
+GH_TOKEN="$GH_TOKEN"
+TG_BOT="$TG_BOT"
+TG_ID="$TG_ID"
+BALE_BOT="$BALE_BOT"
+BALE_ID="$BALE_ID"
+EOF
+    chmod 600 "$CONF_FILE"
+}
+load_config
+
+# ==========================================
+# 3. MENUS
+# ==========================================
+show_main_menu() {
     clear
     echo -e "${CYAN}=================================================${NC}"
-    echo -e "${GREEN}    g2ray Codespace Manager & Auto-Monitor       ${NC}"
+    echo -e "${GREEN}    g2ray Central Manager (Codespaces)           ${NC}"
     echo -e "${CYAN}=================================================${NC}"
     echo ""
-    echo -e "  ${YELLOW}1)${NC} Add or Update a Monitor"
-    echo -e "  ${YELLOW}2)${NC} Remove an active Monitor"
-    echo -e "  ${YELLOW}3)${NC} View Live Logs"
-    echo -e "  ${YELLOW}4)${NC} Advanced Diagnostics"
-    echo -e "  ${YELLOW}5)${NC} Clear Logs"
-    echo -e "  ${YELLOW}0)${NC} Exit"
+    echo -e "  ${YELLOW}1)${NC} 🖥️  Monitors Management"
+    echo -e "  ${YELLOW}2)${NC} ⚙️  Global Settings (Tokens & Alerts)"
+    echo -e "  ${YELLOW}3)${NC} 🛠️  Logs & Diagnostics"
+    echo -e "  ${YELLOW}0)${NC} ❌ Exit"
     echo ""
-    echo -n "  Select an option [0-5]: "
-    read -r OPTION
-    echo ""
-
-    case $OPTION in
-        1) install_monitor ;;
-        2) uninstall_monitor ;;
-        3) view_logs ;;
-        4) advanced_diagnostics ;;
-        5) clear_logs ;;
-        0) exit 0 ;;
-        *) echo -e "${RED}Invalid option!${NC}"; sleep 2; show_menu ;;
+    echo -n "  Select option: "
+    read -r OPT
+    case $OPT in
+        1) menu_monitors ;;
+        2) menu_settings ;;
+        3) menu_diagnostics ;;
+        0) clear; exit 0 ;;
+        *) show_main_menu ;;
     esac
 }
 
-install_monitor() {
-    echo -e "${CYAN}[1/6] Installing dependencies...${NC}"
-    apt-get update -qq
-    apt-get install -y -qq curl jq iputils-ping
-    echo "      Done."
-
+menu_monitors() {
+    clear
+    echo -e "${CYAN}--- 🖥️ Monitors Management ---${NC}"
+    echo -e "  ${YELLOW}1)${NC} ➕ Add New Monitor"
+    echo -e "  ${YELLOW}2)${NC} 🗑️ Remove Monitor"
+    echo -e "  ${YELLOW}3)${NC} 📋 List Active Monitors"
+    echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
     echo ""
-    echo -e "${CYAN}[2/6] GitHub Personal Access Token${NC}"
-    while true; do
-        echo -n "      Paste your token (hidden): "
-        read -sr GH_TOKEN
-        GH_TOKEN=$(echo "$GH_TOKEN" | tr -d '[:space:]')
-        echo ""
-        if [[ -z "$GH_TOKEN" ]]; then echo -e "${RED}      Cannot be empty.${NC}"; continue; fi
-        echo "      Verifying..."
-        LOGIN=$(curl -s --max-time 10 -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user | jq -r '.login // empty' || true)
-        if [[ -n "$LOGIN" ]]; then
-            echo -e "      ${GREEN}OK -- GitHub user: $LOGIN${NC}"
-            break
-        else
-            echo -e "${RED}      Invalid token or no internet. Try again.${NC}"
-        fi
-    done
+    echo -n "  Select option: "
+    read -r OPT
+    case $OPT in
+        1) add_monitor ;;
+        2) remove_monitor ;;
+        3) list_monitors ;;
+        0) show_main_menu ;;
+        *) menu_monitors ;;
+    esac
+}
 
+menu_settings() {
+    clear
+    echo -e "${CYAN}--- ⚙️ Global Settings ---${NC}"
+    echo -e "Current GitHub Token : $(if [[ -n "$GH_TOKEN" ]]; then echo -e "${GREEN}Set${NC}"; else echo -e "${RED}Not Set${NC}"; fi)"
+    echo -e "Current Telegram   : $(if [[ -n "$TG_BOT" ]]; then echo -e "${GREEN}Set${NC}"; else echo -e "${RED}Not Set${NC}"; fi)"
+    echo -e "Current Bale       : $(if [[ -n "$BALE_BOT" ]]; then echo -e "${GREEN}Set${NC}"; else echo -e "${RED}Not Set${NC}"; fi)"
     echo ""
-    echo -e "${CYAN}[3/6] Fetching your codespaces...${NC}"
+    echo -e "  ${YELLOW}1)${NC} Set/Update GitHub Token"
+    echo -e "  ${YELLOW}2)${NC} Set/Update Telegram Alerts"
+    echo -e "  ${YELLOW}3)${NC} Set/Update Bale Alerts"
+    echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
+    echo ""
+    echo -n "  Select option: "
+    read -r OPT
+    case $OPT in
+        1) 
+            echo -n "Enter GitHub Token: "; read -r GH_TOKEN; 
+            save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
+        2) 
+            echo -n "Enter Telegram Bot Token: "; read -r TG_BOT; 
+            echo -n "Enter Telegram Chat ID: "; read -r TG_ID; 
+            save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
+        3) 
+            echo -n "Enter Bale Bot Token: "; read -r BALE_BOT; 
+            echo -n "Enter Bale Chat ID: "; read -r BALE_ID; 
+            save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
+        0) show_main_menu ;;
+        *) menu_settings ;;
+    esac
+}
+
+menu_diagnostics() {
+    clear
+    echo -e "${CYAN}--- 🛠️ Logs & Diagnostics ---${NC}"
+    echo -e "  ${YELLOW}1)${NC} 📜 View Live Logs"
+    echo -e "  ${YELLOW}2)${NC} 🧹 Clear Logs"
+    echo -e "  ${YELLOW}3)${NC} 🩺 Run System Test"
+    echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
+    echo ""
+    echo -n "  Select option: "
+    read -r OPT
+    case $OPT in
+        1) tail -f /var/log/g2ray-monitor.log 2>/dev/null || echo "No logs."; echo "Press Ctrl+C to exit"; sleep 2; menu_diagnostics ;;
+        2) > /var/log/g2ray-monitor.log; echo -e "${GREEN}Logs Cleared!${NC}"; sleep 1; menu_diagnostics ;;
+        3) run_tests; echo -n "Press Enter..."; read -r; menu_diagnostics ;;
+        0) show_main_menu ;;
+        *) menu_diagnostics ;;
+    esac
+}
+
+# ==========================================
+# 4. CORE FUNCTIONS
+# ==========================================
+add_monitor() {
+    if [[ -z "$GH_TOKEN" ]]; then
+        echo -e "\n${RED}[!] GitHub Token is not set! Please go to Global Settings first.${NC}"
+        sleep 2; menu_monitors; return
+    fi
+
+    echo -e "\n${CYAN}Fetching your codespaces...${NC}"
     mapfile -t CODESPACES < <(curl -s --max-time 10 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/user/codespaces | jq -r '.codespaces[].name // empty')
 
     if [[ ${#CODESPACES[@]} -eq 0 ]]; then
-        echo -e "${RED}      ERROR: No codespaces found!${NC}"; sleep 3; show_menu; return
-    fi
-
-    echo "      Available codespaces:"
-    for i in "${!CODESPACES[@]}"; do echo "      $((i+1))) ${CODESPACES[$i]}"; done
-    echo ""
-
-    while true; do
-        echo -n "      Enter the number of the codespace: "
-        read -r SELECTION
-        if [[ "$SELECTION" =~ ^[0-9]+$ ]] && (( SELECTION > 0 && SELECTION <= ${#CODESPACES[@]} )); then
-            CODESPACE_NAME="${CODESPACES[$((SELECTION-1))]}"
-            break
-        else
-            echo -e "${RED}      Invalid selection.${NC}"
-        fi
-    done
-    echo -e "      ${GREEN}Selected: $CODESPACE_NAME${NC}"
-
-    echo ""
-    echo -e "${CYAN}[4/6] Monitoring Interval${NC}"
-    echo -n "      Enter check interval in seconds [Default: 60]: "
-    read -r USER_INTERVAL
-    if [[ -z "$USER_INTERVAL" ]] || ! [[ "$USER_INTERVAL" =~ ^[0-9]+$ ]]; then
-        CHECK_INTERVAL=60
-        echo -e "      ${YELLOW}Using default: 60 seconds.${NC}"
-    else
-        CHECK_INTERVAL="$USER_INTERVAL"
+        echo -e "${RED}No codespaces found or invalid token!${NC}"; sleep 2; menu_monitors; return
     fi
 
     echo ""
-    echo -e "${CYAN}[5/6] Setup Alerts (Telegram / Bale)${NC}"
-    TELEGRAM_BOT_TOKEN=""
-    TELEGRAM_CHAT_ID=""
-    BALE_BOT_TOKEN=""
-    BALE_CHAT_ID=""
-
-    echo "      Where do you want to receive alerts?"
-    echo "      1) Telegram"
-    echo "      2) Bale"
-    echo "      3) Both (Telegram + Bale)"
-    echo "      0) Skip alerts"
-    echo -n "      Your choice [Default: 0]: "
-    read -r ALERT_CHOICE
+    for i in "${!CODESPACES[@]}"; do echo "  $((i+1))) ${CODESPACES[$i]}"; done
+    echo "  0) Cancel"
+    echo -n "  Select codespace to monitor: "
+    read -r SEL
     
-    if [[ -z "$ALERT_CHOICE" ]]; then ALERT_CHOICE="0"; fi
-
-    # Telegram Setup
-    if [[ "$ALERT_CHOICE" == "1" || "$ALERT_CHOICE" == "3" ]]; then
-        echo -e "\n      ${CYAN}--- Telegram Setup ---${NC}"
-        echo -n "      Enter Telegram Bot Token: "
-        read -r RAW_TG_TOKEN
-        TELEGRAM_BOT_TOKEN=$(echo "$RAW_TG_TOKEN" | tr -d '[:space:]')
-        
-        echo -n "      Enter Telegram Chat ID: "
-        read -r RAW_TG_ID
-        TELEGRAM_CHAT_ID=$(echo "$RAW_TG_ID" | tr -d '[:space:]')
-        
-        echo "      Testing Telegram bot..."
-        TG_TEST=$(curl -s --max-time 10 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d text="🔔 <b>پیام تست:</b> سیستم مدیریت برای سرور <code>${CODESPACE_NAME}</code> در تلگرام فعال شد!" \
-            -d parse_mode="HTML" || true)
-            
-        if echo "$TG_TEST" | grep -q '"ok":true'; then
-            echo -e "      ${GREEN}Telegram test message sent successfully!${NC}"
-        else
-            echo -e "      ${RED}Failed to send Telegram message. Check Token/Chat ID.${NC}"
-            TELEGRAM_BOT_TOKEN=""
-            TELEGRAM_CHAT_ID=""
-        fi
+    if [[ "$SEL" == "0" ]]; then menu_monitors; return; fi
+    if ! [[ "$SEL" =~ ^[0-9]+$ ]] || (( SEL < 1 || SEL > ${#CODESPACES[@]} )); then
+        echo -e "${RED}Invalid selection.${NC}"; sleep 1; menu_monitors; return
     fi
+    
+    CS_NAME="${CODESPACES[$((SEL-1))]}"
+    
+    echo -n "  Check interval in seconds [Default: 60]: "
+    read -r INTERVAL
+    [[ -z "$INTERVAL" ]] && INTERVAL=60
 
-    # Bale Setup
-    if [[ "$ALERT_CHOICE" == "2" || "$ALERT_CHOICE" == "3" ]]; then
-        echo -e "\n      ${CYAN}--- Bale Setup ---${NC}"
-        echo -n "      Enter Bale Bot Token: "
-        read -r RAW_BALE_TOKEN
-        BALE_BOT_TOKEN=$(echo "$RAW_BALE_TOKEN" | tr -d '[:space:]')
-        
-        echo -n "      Enter Bale Chat ID: "
-        read -r RAW_BALE_ID
-        BALE_CHAT_ID=$(echo "$RAW_BALE_ID" | tr -d '[:space:]')
-        
-        echo "      Testing Bale bot..."
-        BALE_TEST=$(curl -s --max-time 10 -X POST "https://tapi.bale.ai/bot${BALE_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${BALE_CHAT_ID}" \
-            -d text="🔔 <b>پیام تست:</b> سیستم مدیریت برای سرور <code>${CODESPACE_NAME}</code> در بله فعال شد!" \
-            -d parse_mode="HTML" || true)
-            
-        if echo "$BALE_TEST" | grep -q '"ok":true'; then
-            echo -e "      ${GREEN}Bale test message sent successfully!${NC}"
-        else
-            echo -e "      ${RED}Failed to send Bale message. Check Token/Chat ID.${NC}"
-            BALE_BOT_TOKEN=""
-            BALE_CHAT_ID=""
-        fi
-    fi
-
-    echo ""
-    echo -e "${CYAN}[6/6] Configuring System Service...${NC}"
-    SERVICE_NAME="g2ray-${CODESPACE_NAME}"
-    SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-    ENV_FILE="/etc/g2ray-monitor/${CODESPACE_NAME}.env"
-
-    if systemctl is-active --quiet "$SERVICE_NAME"; then
-        systemctl stop "$SERVICE_NAME"
-    fi
-
-    mkdir -p /etc/g2ray-monitor
-    cat > "$ENV_FILE" << ENVEOF
-GH_TOKEN=$GH_TOKEN
-CODESPACE_NAME=$CODESPACE_NAME
-CHECK_INTERVAL=$CHECK_INTERVAL
-TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN
-TELEGRAM_CHAT_ID=$TELEGRAM_CHAT_ID
-BALE_BOT_TOKEN=$BALE_BOT_TOKEN
-BALE_CHAT_ID=$BALE_CHAT_ID
-ENVEOF
-    chmod 600 "$ENV_FILE"
-
-    cat > /usr/local/bin/g2ray-monitor.sh << 'MONITOREOF'
+    # Build the background worker script ONCE
+    WORKER="/usr/local/bin/g2ray-worker.sh"
+    cat > "$WORKER" << 'WORKEREOF'
 #!/bin/bash
 set -euo pipefail
+source /etc/g2ray-monitor/global.conf
 
-GH_TOKEN="${GH_TOKEN:-}"
-CODESPACE_NAME="${CODESPACE_NAME:-}"
-CHECK_INTERVAL="${CHECK_INTERVAL:-60}"
-TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
-TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"
-BALE_BOT_TOKEN="${BALE_BOT_TOKEN:-}"
-BALE_CHAT_ID="${BALE_CHAT_ID:-}"
-LOG_FILE="/var/log/g2ray-monitor.log"
+CS_NAME="$1"
+INTERVAL="$2"
+LOG="/var/log/g2ray-monitor.log"
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${CODESPACE_NAME}] $*" | tee -a "$LOG_FILE"; }
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] [${CS_NAME}] $*" >> "$LOG"; }
 
 send_alert() {
-    local message="$1"
-    
-    # Send to Telegram
-    if [[ -n "$TELEGRAM_BOT_TOKEN" && -n "$TELEGRAM_CHAT_ID" ]]; then
-        curl -s --max-time 10 -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d text="$message" \
-            -d parse_mode="HTML" > /dev/null || true
-    fi
-    
-    # Send to Bale
-    if [[ -n "$BALE_BOT_TOKEN" && -n "$BALE_CHAT_ID" ]]; then
-        curl -s --max-time 10 -X POST "https://tapi.bale.ai/bot${BALE_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${BALE_CHAT_ID}" \
-            -d text="$message" \
-            -d parse_mode="HTML" > /dev/null || true
-    fi
+    local msg="$1"
+    [[ -n "$TG_BOT" && -n "$TG_ID" ]] && curl -s -X POST "https://api.telegram.org/bot${TG_BOT}/sendMessage" -d chat_id="${TG_ID}" -d text="$msg" -d parse_mode="HTML" > /dev/null
+    [[ -n "$BALE_BOT" && -n "$BALE_ID" ]] && curl -s -X POST "https://tapi.bale.ai/bot${BALE_BOT}/sendMessage" -d chat_id="${BALE_ID}" -d text="$msg" -d parse_mode="HTML" > /dev/null
 }
 
-get_state() {
-    local response
-    response=$(curl -s --max-time 10 \
-        -H "Authorization: Bearer $GH_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/user/codespaces/${CODESPACE_NAME}" || true)
-    if [[ -n "$response" ]]; then
-        echo "$response" | jq -r '.state // empty' 2>/dev/null || echo ""
+start_cs() {
+    log "Down! Attempting to revive..."
+    send_alert "⚠️ سرور <code>${CS_NAME}</code> خاموش شد. در حال استارت مجدد..."
+    res=$(curl -s -o /dev/null -w "%{http_code}" -X POST -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/user/codespaces/${CS_NAME}/start" || true)
+    if [[ "$res" == "200" || "$res" == "202" ]]; then
+        log "Revive successful."
+        send_alert "✅ سرور با موفقیت روشن شد."
     else
-        echo ""
+        log "Revive failed HTTP $res"
+        send_alert "❌ خطا در روشن کردن سرور: $res"
     fi
 }
 
-start_codespace() {
-    log "Codespace is down -- starting..."
-    send_alert "⚠️ <b>هشدار:</b> سرور <code>${CODESPACE_NAME}</code> خاموش شده است! سیستم در حال راه‌اندازی مجدد آن می‌باشد..."
-    
-    local result
-    result=$(curl -s --max-time 10 -o /dev/null -w "%{http_code}" -X POST \
-        -H "Authorization: Bearer $GH_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        "https://api.github.com/user/codespaces/${CODESPACE_NAME}/start" || echo "failed")
-        
-    if [[ "$result" == "200" || "$result" == "202" ]]; then
-        log "Start request sent successfully (HTTP $result)"
-        send_alert "✅ <b>وضعیت:</b> دستور روشن شدن با موفقیت ارسال شد. کداسپیس تا چند ثانیه دیگر متصل می‌شود."
-    else
-        log "ERROR: Start request failed (HTTP $result)"
-        send_alert "❌ <b>خطا:</b> راه‌اندازی مجدد سرور با مشکل مواجه شد (ارور سرور گیت‌هاب: $result)."
-    fi
-}
-
-log "=== g2ray-monitor started ==="
+log "Started monitoring ($INTERVAL s)"
 while true; do
-    STATE=$(get_state)
-    case "$STATE" in
-        Available) log "State: $STATE - OK, running" ;;
-        Shutdown|Stopped) log "State: $STATE - Waking up"; start_codespace ;;
-        Starting|Awaiting*) log "State: $STATE - Waiting for startup" ;;
-        "") log "ERROR: Could not get state -- check network/API" ;;
-        *) log "Unknown state: $STATE" ;;
+    state=$(curl -s -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/user/codespaces/${CS_NAME}" | jq -r '.state // empty' || true)
+    case "$state" in
+        Available) log "OK" ;;
+        Shutdown|Stopped) start_cs ;;
     esac
-    sleep "$CHECK_INTERVAL"
+    sleep "$INTERVAL"
 done
-MONITOREOF
+WORKEREOF
+    chmod +x "$WORKER"
 
-    chmod +x /usr/local/bin/g2ray-monitor.sh
-    touch /var/log/g2ray-monitor.log
-
-    cat > "$SERVICE_FILE" << EOF
+    # Create Service
+    SVC="/etc/systemd/system/g2ray-${CS_NAME}.service"
+    cat > "$SVC" << EOF
 [Unit]
-Description=g2ray Monitor - ${CODESPACE_NAME}
-After=network-online.target
-Wants=network-online.target
+Description=g2ray Monitor (${CS_NAME})
+After=network.target
 
 [Service]
 Type=simple
 User=root
-EnvironmentFile=${ENV_FILE}
-ExecStart=/usr/local/bin/g2ray-monitor.sh
+ExecStart=$WORKER ${CS_NAME} ${INTERVAL}
 Restart=always
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
     systemctl daemon-reload
-    systemctl enable --now "$SERVICE_NAME" >/dev/null 2>&1
+    systemctl enable --now "g2ray-${CS_NAME}.service" >/dev/null 2>&1
+    echo -e "${GREEN}\n[✔] Monitor added and started successfully!${NC}"
     sleep 2
-
-    echo -e "${GREEN}=================================================${NC}"
-    echo -e "${GREEN}   Done! Service is running for $CODESPACE_NAME${NC}"
-    echo -e "${GREEN}=================================================${NC}"
-    sleep 3
-    show_menu
+    menu_monitors
 }
 
-uninstall_monitor() {
-    echo -e "${CYAN}=== Uninstall a Monitor ===${NC}"
-    mapfile -t SERVICES < <(ls /etc/systemd/system/ | grep -E '^g2ray-.*\.service$' || true)
-    
-    if [[ ${#SERVICES[@]} -eq 0 ]]; then
-        echo -e "${YELLOW}No active monitors found.${NC}"
-        sleep 2; show_menu; return
-    fi
+list_monitors() {
+    echo -e "\n${CYAN}--- Active Monitors ---${NC}"
+    systemctl list-units --type=service | grep g2ray- || echo -e "${YELLOW}No monitors running.${NC}"
+    echo -n "Press Enter..."; read -r; menu_monitors
+}
 
+remove_monitor() {
+    mapfile -t SERVICES < <(ls /etc/systemd/system/ | grep -E '^g2ray-.*\.service$' || true)
+    if [[ ${#SERVICES[@]} -eq 0 ]]; then
+        echo -e "${YELLOW}No active monitors.${NC}"; sleep 1; menu_monitors; return
+    fi
+    echo ""
     for i in "${!SERVICES[@]}"; do echo "  $((i+1))) ${SERVICES[$i]}"; done
     echo "  0) Cancel"
-    echo ""
-    echo -n "  Select the monitor to remove: "
-    read -r DEL_SEL
-
-    if [[ "$DEL_SEL" == "0" ]]; then show_menu; return; fi
-
-    if [[ "$DEL_SEL" =~ ^[0-9]+$ ]] && (( DEL_SEL > 0 && DEL_SEL <= ${#SERVICES[@]} )); then
-        TARGET_SERVICE="${SERVICES[$((DEL_SEL-1))]}"
-        TARGET_ENV_NAME=$(echo "$TARGET_SERVICE" | sed 's/g2ray-//' | sed 's/\.service//')
-        
-        echo -e "  ${YELLOW}Stopping and removing $TARGET_SERVICE...${NC}"
-        systemctl stop "$TARGET_SERVICE" 2>/dev/null || true
-        systemctl disable "$TARGET_SERVICE" 2>/dev/null || true
-        rm -f "/etc/systemd/system/$TARGET_SERVICE"
-        rm -f "/etc/g2ray-monitor/${TARGET_ENV_NAME}.env"
+    echo -n "  Select to remove: "
+    read -r SEL
+    if [[ "$SEL" == "0" ]]; then menu_monitors; return; fi
+    if [[ "$SEL" =~ ^[0-9]+$ ]] && (( SEL > 0 && SEL <= ${#SERVICES[@]} )); then
+        SVC="${SERVICES[$((SEL-1))]}"
+        systemctl disable --now "$SVC" 2>/dev/null || true
+        rm -f "/etc/systemd/system/$SVC"
         systemctl daemon-reload
-        echo -e "  ${GREEN}Successfully removed!${NC}"
-    else
-        echo -e "${RED}Invalid selection.${NC}"
+        echo -e "${GREEN}Removed successfully!${NC}"
     fi
-    sleep 2
-    show_menu
+    sleep 1; menu_monitors
 }
 
-view_logs() {
-    if [[ -f /var/log/g2ray-monitor.log ]]; then
-        echo -e "${CYAN}Showing logs... (Press Ctrl+C to return to menu)${NC}"
-        trap 'show_menu' INT
-        tail -f /var/log/g2ray-monitor.log
-        trap - INT
-    else
-        echo -e "${YELLOW}No logs found yet.${NC}"
-        sleep 2
-        show_menu
-    fi
+run_tests() {
+    echo -e "\n${CYAN}Running Diagnostics...${NC}"
+    ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo -e "Internet: ${GREEN}OK${NC}" || echo -e "Internet: ${RED}Fail${NC}"
+    [[ -n "$GH_TOKEN" ]] && echo -e "GitHub Auth: ${GREEN}Ready${NC}" || echo -e "GitHub Auth: ${RED}Missing${NC}"
+    curl -s -m 3 https://api.telegram.org >/dev/null && echo -e "Telegram API: ${GREEN}Reachable${NC}" || echo -e "Telegram API: ${RED}Blocked${NC}"
 }
 
-clear_logs() {
-    > /var/log/g2ray-monitor.log
-    echo -e "${GREEN}Logs cleared successfully!${NC}"
-    sleep 2
-    show_menu
-}
-
-advanced_diagnostics() {
-    clear
-    echo -e "${CYAN}=== 🛠 Advanced Diagnostics ===${NC}"
-    echo ""
-    
-    echo -e "${YELLOW}1. Server Internet & Ping:${NC}"
-    if ping -c 3 8.8.8.8 >/dev/null 2>&1; then echo -e "   ${GREEN}✔ OK (Internet is connected)${NC}"; else echo -e "   ${RED}❌ FAILED (No internet connection)${NC}"; fi
-    
-    echo -e "\n${YELLOW}2. GitHub API Access:${NC}"
-    HTTP_GH=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 https://api.github.com || echo "000")
-    if [[ "$HTTP_GH" == "200" || "$HTTP_GH" == "401" ]]; then echo -e "   ${GREEN}✔ OK (HTTP $HTTP_GH)${NC}"; else echo -e "   ${RED}❌ FAILED (HTTP $HTTP_GH)${NC}"; fi
-
-    echo -e "\n${YELLOW}3. Telegram API Access:${NC}"
-    HTTP_TG=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 https://api.telegram.org || echo "000")
-    if [[ "$HTTP_TG" == "200" ]]; then echo -e "   ${GREEN}✔ OK (Not blocked)${NC}"; else echo -e "   ${RED}❌ FAILED (Blocked or Network error)${NC}"; fi
-
-    echo -e "\n${YELLOW}4. Bale API Access:${NC}"
-    HTTP_BALE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 https://tapi.bale.ai || echo "000")
-    if [[ "$HTTP_BALE" == "200" || "$HTTP_BALE" == "404" ]]; then echo -e "   ${GREEN}✔ OK (Not blocked)${NC}"; else echo -e "   ${RED}❌ FAILED (Blocked or Network error)${NC}"; fi
-
-    echo -e "\n${YELLOW}5. Active g2ray Services:${NC}"
-    systemctl list-units --type=service | grep g2ray || echo -e "   ${YELLOW}No active services found.${NC}"
-
-    echo -e "\n${YELLOW}6. System Resources (RAM & Disk):${NC}"
-    free -m | awk 'NR==2{printf "   RAM: %sMB / %sMB (%.2f%% used)\n", $3,$2,$3*100/$2 }'
-    df -h / | awk 'NR==2{printf "   Disk: %s / %s (%s used)\n", $3,$2,$5 }'
-    
-    echo ""
-    echo -n "Press Enter to return to menu..."
-    read -r
-    show_menu
-}
-
-show_menu
+# START APP
+show_main_menu
