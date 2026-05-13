@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-
 [[ $EUID -ne 0 ]] && echo "Run with sudo" && exit 1
 exec < /dev/tty
 
