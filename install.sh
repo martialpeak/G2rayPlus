@@ -17,7 +17,7 @@ cd /etc/g2ray-monitor
 
 echo -e "\e[34m[+]\e[0m Downloading g2ray bot..."
 # حتما لینک زیر را با لینک RAW فایل bot.py در گیت‌هاب خودتان عوض کنید:
-wget -qO bot.py "https://raw.githubusercontent.com/USERNAME/REPONAME/main/bot.py"
+wget -qO bot.py "https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/bot.py"
 
 echo -e "\e[33m[?]\e[0m Enter your Telegram Bot Token (from @BotFather): "
 read -r user_bot_token
