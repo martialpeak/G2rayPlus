@@ -166,11 +166,11 @@ def show_main_menu(chat_id, edit_message_id=None):
 
     if edit_message_id:
         try:
-            bot.edit_message_text(text, chat_id, edit_message_id, reply_markup=markup, parse_mode="Markdown")
+            bot.edit_message_text(text, chat_id, edit_message_id, reply_markup=markup, parse_mode=None)
         except Exception:
-            bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+            bot.send_message(chat_id, text, reply_markup=markup, parse_mode=None)
     else:
-        bot.send_message(chat_id, text, reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(chat_id, text, reply_markup=markup, parse_mode=None)
 
 def back_button(target="main"):
     markup = InlineKeyboardMarkup()
@@ -208,7 +208,7 @@ def cmd_help(message):
         "/logs — آخرین لاگ‌ها\n"
         "/help — این راهنما\n"
     )
-    bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    bot.send_message(message.chat.id, text, parse_mode=None)
 
 # ─────────────────────────────────────────
 # توابع نمایش اطلاعات
@@ -228,7 +228,7 @@ def handle_status(chat_id):
         lines.append(f"{icon} `{cs_name}` — {st}")
 
     lines.append(f"\n🕐 آخرین بروزرسانی: {time.strftime('%H:%M:%S')}")
-    bot.send_message(chat_id, "\n".join(lines), parse_mode="Markdown", reply_markup=back_button())
+    bot.send_message(chat_id, "\n".join(lines), parse_mode=None, reply_markup=back_button())
 
 def handle_logs(chat_id, lines_count=20):
     cmd = f"tail -n {lines_count} /var/log/g2ray-monitor.log 2>/dev/null || echo 'لاگی یافت نشد'"
@@ -243,7 +243,7 @@ def handle_logs(chat_id, lines_count=20):
     bot.send_message(
         chat_id,
         f"📜 **آخرین {lines_count} خط لاگ** (سایز: {get_log_file_size()}):\n\n```\n{res.strip()}\n```",
-        parse_mode="Markdown",
+        parse_mode=None,
         reply_markup=markup
     )
 
@@ -272,7 +272,7 @@ def handle_gh_status(chat_id):
 
     lines.append(f"\n🕐 {time.strftime('%H:%M:%S')}")
     bot.edit_message_text("\n".join(lines), chat_id, msg.message_id,
-                          parse_mode="Markdown", reply_markup=back_button())
+                          parse_mode=None, reply_markup=back_button())
 
 def handle_list_monitors(chat_id):
     services = get_services()
@@ -295,7 +295,7 @@ def handle_list_monitors(chat_id):
                         interval = line.strip().split('=', 1)[1] + "s"
         lines.append(f"{i}. {icon} `{cs_name}`\n   ├ سرویس: {st}\n   └ فاصله: {interval}")
 
-    bot.send_message(chat_id, "\n".join(lines), parse_mode="Markdown", reply_markup=back_button())
+    bot.send_message(chat_id, "\n".join(lines), parse_mode=None, reply_markup=back_button())
 
 def handle_system_info(chat_id):
     try:
@@ -320,7 +320,7 @@ def handle_system_info(chat_id):
         )
     except Exception as e:
         text = f"❌ خطا در دریافت اطلاعات: {e}"
-    bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=back_button())
+    bot.send_message(chat_id, text, parse_mode=None, reply_markup=back_button())
 
 # ─────────────────────────────────────────
 # هندلر اصلی callback
@@ -425,7 +425,7 @@ def callback_query(call):
             markup.add(InlineKeyboardButton(f"{icon} {cs_name} {st_icon}", callback_data=f"{prefix}{cs_name}"))
         markup.add(InlineKeyboardButton("🔙 بازگشت", callback_data="back_main"))
         bot.answer_callback_query(call.id)
-        bot.send_message(chat_id, f"❓ **کدام سرور {action} شود؟**", reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(chat_id, f"❓ **کدام سرور {action} شود؟**", reply_markup=markup, parse_mode=None)
 
     elif data.startswith("stopcs_"):
         cs_name = data.split("stopcs_", 1)[1]
@@ -443,15 +443,15 @@ def callback_query(call):
                 bot.send_message(chat_id,
                     f"🛑 مانیتورینگ متوقف شد و دستور خاموشی به GitHub ارسال گردید.\n"
                     f"سرور `{cs_name}` تا لحظاتی دیگر خاموش می‌شود.",
-                    parse_mode="Markdown", reply_markup=back_button())
+                    parse_mode=None, reply_markup=back_button())
             else:
                 bot.send_message(chat_id,
                     f"⚠️ سرویس متوقف شد ولی ارسال دستور به GitHub با خطا مواجه شد (کد: {code}).",
-                    parse_mode="Markdown", reply_markup=back_button())
+                    parse_mode=None, reply_markup=back_button())
         else:
             bot.send_message(chat_id,
                 f"🛑 سرویس مانیتورینگ `{cs_name}` متوقف شد.\n(توکن یافت نشد — دستور GitHub ارسال نشد)",
-                parse_mode="Markdown", reply_markup=back_button())
+                parse_mode=None, reply_markup=back_button())
 
     elif data.startswith("startcs_"):
         cs_name = data.split("startcs_", 1)[1]
@@ -459,7 +459,7 @@ def callback_query(call):
         subprocess.run(f"systemctl start g2ray-{cs_name}.service", shell=True)
         bot.send_message(chat_id,
             f"▶️ سیستم مانیتورینگ برای `{cs_name}` فعال شد.\nسرور به زودی روشن می‌شود.",
-            parse_mode="Markdown", reply_markup=back_button())
+            parse_mode=None, reply_markup=back_button())
 
     # ── افزودن مانیتور ──
     elif data == "add_monitor":
@@ -467,8 +467,8 @@ def callback_query(call):
         user_states[chat_id] = {'step': 'waiting_token'}
         bot.send_message(chat_id,
             "🔑 لطفاً **توکن GitHub** (GH_TOKEN) خود را ارسال کنید:\n\n"
-            "_(برای لغو /menu را بفرستید)_",
-            parse_mode="Markdown")
+            "(برای لغو /menu را بفرستید)",
+            parse_mode=None)
 
     # ── حذف مانیتور ──
     elif data == "remove_monitor":
@@ -483,7 +483,7 @@ def callback_query(call):
             markup.add(InlineKeyboardButton(f"❌ {cs_name}", callback_data=f"del_confirm_{cs_name}"))
         markup.add(InlineKeyboardButton("🔙 بازگشت", callback_data="back_main"))
         bot.answer_callback_query(call.id)
-        bot.send_message(chat_id, "🗑 **کدام مانیتور حذف شود؟**", reply_markup=markup, parse_mode="Markdown")
+        bot.send_message(chat_id, "🗑 **کدام مانیتور حذف شود؟**", reply_markup=markup, parse_mode=None)
 
     # ── تأیید حذف (دو مرحله‌ای) ──
     elif data.startswith("del_confirm_"):
@@ -496,7 +496,7 @@ def callback_query(call):
         bot.answer_callback_query(call.id)
         bot.send_message(chat_id,
             f"⚠️ آیا مطمئنید که مانیتور `{cs_name}` برای همیشه حذف شود؟",
-            reply_markup=markup, parse_mode="Markdown")
+            reply_markup=markup, parse_mode=None)
 
     elif data.startswith("del_"):
         cs_name = data.split("del_", 1)[1]
@@ -514,7 +514,7 @@ def callback_query(call):
         subprocess.run(cmd, shell=True)
         bot.send_message(chat_id,
             f"✅ مانیتور `{cs_name}` با موفقیت حذف شد.",
-            parse_mode="Markdown", reply_markup=back_button())
+            parse_mode=None, reply_markup=back_button())
 
     # ── انتخاب Codespace ──
     elif data.startswith("cs_"):
@@ -528,7 +528,7 @@ def callback_query(call):
             f"✅ سرور `{cs_name}` انتخاب شد.\n\n"
             f"⏱ فاصله زمانی بررسی (ثانیه) را وارد کنید:\n"
             f"پیشنهاد: 60 یا 120",
-            parse_mode="Markdown")
+            parse_mode=None)
 
 # ─────────────────────────────────────────
 # فرایند افزودن مانیتور (State Machine)
@@ -738,7 +738,7 @@ done
         f"🎉 مانیتورینگ برای `{cs_name}` با موفقیت راه‌اندازی شد!\n"
         f"⏱ فاصله بررسی: {interval} ثانیه\n\n"
         f"برای مشاهده وضعیت از منوی اصلی استفاده کنید.",
-        parse_mode="Markdown",
+        parse_mode=None,
         reply_markup=back_button()
     )
     user_states.pop(chat_id, None)
