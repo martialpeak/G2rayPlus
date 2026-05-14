@@ -481,9 +481,12 @@ def callback_query(call):
     elif data.startswith("del_"):
         cs_name = data.split("del_", 1)[1]
         bot.answer_callback_query(call.id, "در حال حذف...")
+        
+        # --- بخش اصلاح شده: اضافه شدن دستور pkill برای نابودی پروسه در حال اجرا ---
         cmd = (
             f"systemctl stop g2ray-{cs_name}.service 2>/dev/null; "
             f"systemctl disable g2ray-{cs_name}.service 2>/dev/null; "
+            f"pkill -9 -f {cs_name} 2>/dev/null; "
             f"rm -f /etc/systemd/system/g2ray-{cs_name}.service; "
             f"rm -f /etc/g2ray-monitor/{cs_name}.env; "
             f"systemctl daemon-reload"
@@ -678,6 +681,7 @@ done
         f.write(monitor_script)
     os.chmod('/usr/local/bin/g2ray-monitor.sh', 0o755)
 
+    # --- بخش اصلاح شده: اضافه شدن دستورات جلوگیری از زامبی شدن به فایل systemd ---
     service_content = (
         f"[Unit]\n"
         f"Description=g2ray Monitor - {cs_name}\n"
@@ -690,6 +694,9 @@ done
         f"ExecStart=/usr/local/bin/g2ray-monitor.sh\n"
         f"Restart=always\n"
         f"RestartSec=15\n"
+        f"TimeoutStopSec=3\n"
+        f"KillSignal=SIGKILL\n"
+        f"SendSIGKILL=yes\n"
         f"StandardOutput=journal\n"
         f"StandardError=journal\n\n"
         f"[Install]\n"
