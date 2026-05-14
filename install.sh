@@ -38,9 +38,15 @@ if [[ "${BASH_SOURCE[0]}" != "/usr/local/bin/g2ray" ]]; then
     cp "${BASH_SOURCE[0]}" /usr/local/bin/g2ray
     chmod +x /usr/local/bin/g2ray
     
-    # کپی کردن فایل ربات به مسیر امن سیستم
-    cp "$(dirname "${BASH_SOURCE[0]}")/bot.py" /etc/g2ray-monitor/bot.py 2>/dev/null || true
+    # دانلود مستقیم فایل ربات از گیت‌هاب و قرار دادن در مسیر سیستم
+    echo -e "${CYAN}[+] Downloading bot.py from GitHub...${NC}"
+    curl -Ls https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/bot.py -o /etc/g2ray-monitor/bot.py
     
+    # بررسی اینکه فایل با موفقیت دانلود شده باشد
+    if [[ ! -f /etc/g2ray-monitor/bot.py ]]; then
+        echo -e "${RED}[!] Error: Failed to download bot.py!${NC}"
+        exit 1
+    fi
     echo -e "${GREEN}[✔] Update successful!${NC}"
     echo -e "From now on, just type ${YELLOW}g2ray${NC} anywhere in your terminal."
     sleep 2
