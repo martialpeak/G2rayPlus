@@ -6,32 +6,42 @@ import json
 import os
 import sys
 import time
-import threading
 
 # ==========================================
-# ✈️ اطلاعات تلگرام (اگر ندارید دست نزنید)
-TG_BOT_TOKEN = 'YOUR_TG_TOKEN_HERE'
-TG_CHAT_ID = 'YOUR_TG_CHAT_ID_HERE'
-
-# 🔵 اطلاعات بله (اگر ندارید دست نزنید)
-BALE_BOT_TOKEN = 'YOUR_BALE_TOKEN_HERE'
-BALE_CHAT_ID = 'YOUR_BALE_CHAT_ID_HERE'
+# خواندن اتوماتیک توکن‌ها از فایل کانفیگ ترمینال
 # ==========================================
+def load_config():
+    conf_path = "/etc/g2ray-monitor/global.conf"
+    config = {'TG_BOT': '', 'TG_ID': '', 'BALE_BOT': '', 'BALE_ID': ''}
+    if os.path.exists(conf_path):
+        with open(conf_path, 'r') as f:
+            for line in f:
+                if '=' in line:
+                    key, val = line.strip().split('=', 1)
+                    config[key] = val.strip('"').strip("'")
+    return config
+
+cfg = load_config()
+
+TG_BOT_TOKEN = cfg.get('TG_BOT', '')
+TG_CHAT_ID = cfg.get('TG_ID', '')
+BALE_BOT_TOKEN = cfg.get('BALE_BOT', '')
+BALE_CHAT_ID = cfg.get('BALE_ID', '')
 
 # تشخیص اینکه اسکریپت برای کدام پیام‌رسان اجرا شده است
 platform = sys.argv[1] if len(sys.argv) > 1 else 'telegram'
 
 if platform == 'bale':
-    if not BALE_BOT_TOKEN or BALE_BOT_TOKEN == 'YOUR_BALE_TOKEN_HERE':
-        print("Bale token not set. Exiting.")
+    if not BALE_BOT_TOKEN:
+        print("Bale token not set in global.conf. Exiting.")
         sys.exit(0)
     apihelper.API_URL = "https://tapi.bale.ai/bot{0}/{1}"
     BOT_TOKEN = BALE_BOT_TOKEN
     ADMIN_ID = BALE_CHAT_ID
     APP_NAME = "بله 🔵"
 else:
-    if not TG_BOT_TOKEN or TG_BOT_TOKEN == 'YOUR_TG_TOKEN_HERE':
-        print("Telegram token not set. Exiting.")
+    if not TG_BOT_TOKEN:
+        print("Telegram token not set in global.conf. Exiting.")
         sys.exit(0)
     BOT_TOKEN = TG_BOT_TOKEN
     ADMIN_ID = TG_CHAT_ID
@@ -39,7 +49,6 @@ else:
 
 bot = telebot.TeleBot(BOT_TOKEN)
 user_states = {}
-
 # ─────────────────────────────────────────
 # توابع کمکی
 # ─────────────────────────────────────────
