@@ -461,14 +461,15 @@ def callback_query(call):
             f"▶️ سیستم مانیتورینگ برای `{cs_name}` فعال شد.\nسرور به زودی روشن می‌شود.",
             parse_mode=None, reply_markup=back_button())
 
-    # ── افزودن مانیتور ──
+   # ── افزودن مانیتور ──
     elif data == "add_monitor":
         bot.answer_callback_query(call.id)
         user_states[chat_id] = {'step': 'waiting_token'}
+        markup = InlineKeyboardMarkup()
+        markup.add(InlineKeyboardButton("❌ لغو و بازگشت", callback_data="back_main"))
         bot.send_message(chat_id,
-            "🔑 لطفاً **توکن GitHub** (GH_TOKEN) خود را ارسال کنید:\n\n"
-            "(برای لغو /menu را بفرستید)",
-            parse_mode=None)
+            "🔑 لطفاً توکن GitHub (GH_TOKEN) خود را ارسال کنید:",
+            parse_mode=None, reply_markup=markup)
 
     # ── حذف مانیتور ──
     elif data == "remove_monitor":
