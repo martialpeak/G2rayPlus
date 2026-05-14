@@ -214,11 +214,15 @@ menu_settings() {
         1) 
             echo -n "Enter Telegram Bot Token: "; read -r TG_BOT; 
             echo -n "Enter Telegram Chat ID: "; read -r TG_ID; 
-            save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
+            save_config; 
+            setup_bot_service "telegram"
+            echo -e "${GREEN}Saved & Telegram Bot Started!${NC}"; sleep 1; menu_settings ;;
         2) 
             echo -n "Enter Bale Bot Token: "; read -r BALE_BOT; 
             echo -n "Enter Bale Chat ID: "; read -r BALE_ID; 
-            save_config; echo -e "${GREEN}Saved!${NC}"; sleep 1; menu_settings ;;
+            save_config; 
+            setup_bot_service "bale"
+            echo -e "${GREEN}Saved & Bale Bot Started!${NC}"; sleep 1; menu_settings ;;
         3)  purge_all ;;
         0) show_main_menu ;;
         *) menu_settings ;;
