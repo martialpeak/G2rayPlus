@@ -326,6 +326,26 @@ def handle_system_info(chat_id):
 # هندلر اصلی callback
 # ─────────────────────────────────────────
 
+@bot.message_handler(func=lambda message: True)
+def handle_text_input(message):
+    if not check_auth(message.from_user.id):
+        return
+    chat_id = message.chat.id
+    text = message.text or ""
+
+    # اگر دستور بود، state را پاک کن
+    if text.startswith('/'):
+        user_states.pop(chat_id, None)
+        return
+
+    state = user_states.get(chat_id, {})
+    step = state.get('step')
+
+    if step == 'waiting_token':
+        process_token_state(message)
+    elif step == 'waiting_interval':
+        process_interval_state(message)
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if not check_auth(call.from_user.id):
@@ -410,7 +430,7 @@ def callback_query(call):
     elif data.startswith("stopcs_"):
         cs_name = data.split("stopcs_", 1)[1]
         bot.answer_callback_query(call.id, "در حال متوقف کردن...")
-        subprocess.run(f"systemctl stop g2ray-{cs_name}.service", shell=True)
+        subprocess.run(f"systemctl stop g2ray-{cs_name}.service 2>/dev/null; pkill -9 -f 'g2ray-monitor.sh' 2>/dev/null || true", shell=True)
         token = get_env_token(cs_name)
         if token:
             cmd = (
@@ -444,11 +464,11 @@ def callback_query(call):
     # ── افزودن مانیتور ──
     elif data == "add_monitor":
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(chat_id,
+        user_states[chat_id] = {'step': 'waiting_token'}
+        bot.send_message(chat_id,
             "🔑 لطفاً **توکن GitHub** (GH_TOKEN) خود را ارسال کنید:\n\n"
             "_(برای لغو /menu را بفرستید)_",
             parse_mode="Markdown")
-        bot.register_next_step_handler(msg, process_token)
 
     # ── حذف مانیتور ──
     elif data == "remove_monitor":
@@ -499,25 +519,26 @@ def callback_query(call):
     # ── انتخاب Codespace ──
     elif data.startswith("cs_"):
         cs_name = data.split("cs_", 1)[1]
+        if chat_id not in user_states:
+            user_states[chat_id] = {}
         user_states[chat_id]['codespace'] = cs_name
+        user_states[chat_id]['step'] = 'waiting_interval'
         bot.answer_callback_query(call.id)
-        msg = bot.send_message(chat_id,
+        bot.send_message(chat_id,
             f"✅ سرور `{cs_name}` انتخاب شد.\n\n"
             f"⏱ فاصله زمانی بررسی (ثانیه) را وارد کنید:\n"
             f"پیشنهاد: 60 یا 120",
             parse_mode="Markdown")
-        bot.register_next_step_handler(msg, process_interval)
 
 # ─────────────────────────────────────────
-# فرایند افزودن مانیتور
+# فرایند افزودن مانیتور (State Machine)
 # ─────────────────────────────────────────
 
-def process_token(message):
-    if message.text and message.text.startswith('/'):
-        return  # کاربر دستور فرستاده، صرف‌نظر می‌کنیم
+def process_token_state(message):
     chat_id = message.chat.id
     token   = message.text.strip()
-    user_states[chat_id] = {'token': token}
+    user_states[chat_id]['token'] = token
+    user_states[chat_id]['step']  = 'waiting_codespace'
     wait_msg = bot.send_message(chat_id, "⏳ در حال اتصال به GitHub...")
     cmd = (
         f'curl -s --max-time 10 '
@@ -530,6 +551,7 @@ def process_token(message):
         data = json.loads(res)
         if 'codespaces' not in data or not data['codespaces']:
             bot.edit_message_text("❌ توکن نامعتبر است یا Codespace‌ای یافت نشد.", chat_id, wait_msg.message_id)
+            user_states.pop(chat_id, None)
             return
         markup = InlineKeyboardMarkup()
         for cs in data['codespaces']:
@@ -543,10 +565,9 @@ def process_token(message):
         )
     except Exception as e:
         bot.edit_message_text(f"❌ خطا در اتصال: {e}", chat_id, wait_msg.message_id)
+        user_states.pop(chat_id, None)
 
-def process_interval(message):
-    if message.text and message.text.startswith('/'):
-        return
+def process_interval_state(message):
     chat_id  = message.chat.id
     interval = message.text.strip()
     if not interval.isdigit() or int(interval) < 10:
@@ -558,8 +579,12 @@ def process_interval(message):
 
     if not token or not cs_name:
         bot.send_message(chat_id, "❌ خطا: اطلاعات ناقص است. دوباره از /menu شروع کنید.")
+        user_states.pop(chat_id, None)
         return
 
+    _install_monitor(chat_id, token, cs_name, interval)
+
+def _install_monitor(chat_id, token, cs_name, interval):
     os.makedirs('/etc/g2ray-monitor', exist_ok=True)
     env_file     = f"/etc/g2ray-monitor/{cs_name}.env"
     service_file = f"/etc/systemd/system/g2ray-{cs_name}.service"
@@ -681,7 +706,6 @@ done
         f.write(monitor_script)
     os.chmod('/usr/local/bin/g2ray-monitor.sh', 0o755)
 
-    # --- بخش اصلاح شده: اضافه شدن دستورات جلوگیری از زامبی شدن به فایل systemd ---
     service_content = (
         f"[Unit]\n"
         f"Description=g2ray Monitor - {cs_name}\n"
@@ -718,6 +742,8 @@ done
         reply_markup=back_button()
     )
     user_states.pop(chat_id, None)
+
+
 
 # ─────────────────────────────────────────
 # اجرا
