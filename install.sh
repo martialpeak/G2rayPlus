@@ -19,33 +19,33 @@ mkdir -p "$CONF_DIR"
 touch "$CONF_FILE"
 
 # ==========================================
-# 0. CLEANUP OLD CODES & PYTHON BOTS
+# 0. CLEANUP OLD CODES (ربات‌ها دیگر حذف نمی‌شوند)
 # ==========================================
-systemctl stop g2ray-panel.service g2ray-telegram.service g2ray-bale.service g2ray-tg-bot.service g2ray-bale-bot.service 2>/dev/null || true
-systemctl disable g2ray-panel.service g2ray-telegram.service g2ray-bale.service g2ray-tg-bot.service g2ray-bale-bot.service 2>/dev/null || true
-rm -f /etc/systemd/system/g2ray-panel.service \
-      /etc/systemd/system/g2ray-telegram.service \
-      /etc/systemd/system/g2ray-bale.service \
-      /etc/systemd/system/g2ray-tg-bot.service \
-      /etc/systemd/system/g2ray-bale-bot.service \
-      /etc/g2ray-monitor/bot.py \
-      /opt/g2ray-bot/bot.py 2>/dev/null || true
+systemctl stop g2ray-panel.service 2>/dev/null || true
+rm -f /etc/systemd/system/g2ray-panel.service 2>/dev/null || true
 systemctl daemon-reload
 
 # ==========================================
-# 1. AUTO-INSTALL GLOBAL COMMAND
+# 1. AUTO-INSTALL GLOBAL COMMAND & PYTHON DEPS
 # ==========================================
 if [[ "${BASH_SOURCE[0]}" != "/usr/local/bin/g2ray" ]]; then
     echo -e "${CYAN}[+] Installing 'g2ray' core to system...${NC}"
-    apt-get update -qq && apt-get install -y -qq curl jq iputils-ping
+    apt-get update -qq && apt-get install -y -qq curl jq iputils-ping python3 python3-pip
+    
+    # نصب کتابخانه تلگرام
+    pip3 install pyTelegramBotAPI --break-system-packages 2>/dev/null || pip3 install pyTelegramBotAPI
+    
     cp "${BASH_SOURCE[0]}" /usr/local/bin/g2ray
     chmod +x /usr/local/bin/g2ray
+    
+    # کپی کردن فایل ربات به مسیر امن سیستم
+    cp "$(dirname "${BASH_SOURCE[0]}")/bot.py" /etc/g2ray-monitor/bot.py 2>/dev/null || true
+    
     echo -e "${GREEN}[✔] Update successful!${NC}"
     echo -e "From now on, just type ${YELLOW}g2ray${NC} anywhere in your terminal."
     sleep 2
     exec g2ray
 fi
-
 # ==========================================
 # 2. GLOBAL SETTINGS (Only Telegram/Bale)
 # ==========================================
@@ -128,7 +128,29 @@ run_tests() {
     curl -s -m 3 https://tapi.bale.ai >/dev/null && echo -e "Bale API     : ${GREEN}Reachable${NC}" || echo -e "Bale API     : ${RED}Blocked${NC}"
 }
 
+setup_bot_service() {
+    local platform=$1
+    local svc_name="g2ray-${platform}-bot.service"
+    
+    cat > "/etc/systemd/system/${svc_name}" <<EOF
+[Unit]
+Description=g2ray ${platform} interactive bot
+After=network.target
 
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /etc/g2ray-monitor/bot.py ${platform}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl restart "${svc_name}"
+    systemctl enable "${svc_name}" >/dev/null 2>&1
+}
 # ==========================================
 # 3. MENUS
 # ==========================================
