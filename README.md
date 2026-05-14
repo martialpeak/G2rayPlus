@@ -26,7 +26,7 @@
 ```bash
 curl -Ls https://raw.githubusercontent.com/martialpeak/G2rayPlus/refs/heads/main/install.sh -o install.sh && bash install.sh
 ```
-(در حین نصب، توکن ربات و آیدی تلگرام شما پرسیده خواهد شد).
+
 
 💎 حمایت مالی (Donate)
 توسعه و نگهداری ابزارهای متن‌باز زمان‌بر است. اگر این پروژه برای شما مفید بود و به پایداری سرورهای شما کمک کرد، می‌توانید با دعوت کردن من به یک قهوه از توسعه آن حمایت کنید:
