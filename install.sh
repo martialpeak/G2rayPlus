@@ -19,7 +19,7 @@ mkdir -p "$CONF_DIR"
 touch "$CONF_FILE"
 
 # ==========================================
-# 0. CLEANUP OLD CODES (ربات‌ها دیگر حذف نمی‌شوند)
+# 0. CLEANUP OLD CODES
 # ==========================================
 systemctl stop g2ray-panel.service 2>/dev/null || true
 rm -f /etc/systemd/system/g2ray-panel.service 2>/dev/null || true
@@ -52,6 +52,7 @@ if [[ "${BASH_SOURCE[0]}" != "/usr/local/bin/g2ray" ]]; then
     sleep 2
     exec g2ray
 fi
+
 # ==========================================
 # 2. GLOBAL SETTINGS (Only Telegram/Bale)
 # ==========================================
@@ -123,8 +124,6 @@ menu_monitors() {
     esac
 }
 
-# ... (بقیه توابع add_monitor, remove_monitor, power_control ثابت می‌مانند) ...
-
 # تابع Diagnostics اصلاح شده با آدرس گیت‌هاب
 run_tests() {
     echo -e "\n${CYAN}Running Diagnostics...${NC}"
@@ -156,51 +155,6 @@ EOF
     systemctl daemon-reload
     systemctl restart "${svc_name}"
     systemctl enable "${svc_name}" >/dev/null 2>&1
-}
-# ==========================================
-# 3. MENUS
-# ==========================================
-show_main_menu() {
-    clear
-    echo -e "${CYAN}=================================================${NC}"
-    echo -e "${GREEN}    g2ray Central Manager (Codespaces)           ${NC}"
-    echo -e "${CYAN}=================================================${NC}"
-    echo ""
-    echo -e "  ${YELLOW}1)${NC} 🖥️  Monitors Management"
-    echo -e "  ${YELLOW}2)${NC} ⚙️  Global Alerts & Cleanup"
-    echo -e "  ${YELLOW}3)${NC} 🛠️  Logs & Diagnostics"
-    echo -e "  ${YELLOW}0)${NC} ❌ Exit"
-    echo ""
-    echo -n "  Select option: "
-    read -r OPT
-    case $OPT in
-        1) menu_monitors ;;
-        2) menu_settings ;;
-        3) menu_diagnostics ;;
-        0) clear; exit 0 ;;
-        *) show_main_menu ;;
-    esac
-}
-
-menu_monitors() {
-    clear
-    echo -e "${CYAN}--- 🖥️ Monitors Management ---${NC}"
-    echo -e "  ${YELLOW}1)${NC} ➕ Add New Monitor (Requires GitHub Token)"
-    echo -e "  ${YELLOW}2)${NC} 🗑️ Remove a Monitor"
-    echo -e "  ${YELLOW}3)${NC} 📋 List Active Monitors"
-    echo -e "  ${YELLOW}4)${NC} 🔌 Power Control (Start/Stop Server)"
-    echo -e "  ${YELLOW}0)${NC} 🔙 Back to Main Menu"
-    echo ""
-    echo -n "  Select option: "
-    read -r OPT
-    case $OPT in
-        1) add_monitor ;;
-        2) remove_monitor ;;
-        3) list_monitors ;;
-        4) power_control ;;
-        0) show_main_menu ;;
-        *) menu_monitors ;;
-    esac
 }
 
 menu_settings() {
@@ -364,6 +318,9 @@ User=root
 ExecStart=$WORKER ${CS_NAME}
 Restart=always
 RestartSec=10
+TimeoutStopSec=3
+KillSignal=SIGKILL
+SendSIGKILL=yes
 
 [Install]
 WantedBy=multi-user.target
@@ -398,6 +355,9 @@ remove_monitor() {
         TARGET_ENV=$(echo "$SVC" | sed 's/g2ray-//' | sed 's/\.service//')
         
         systemctl disable --now "$SVC" 2>/dev/null || true
+        # --- دستور اختصاصی برای کشتن پروسه زامبی ---
+        pkill -9 -f "$TARGET_ENV" 2>/dev/null || true
+        # ------------------------------------------
         rm -f "/etc/systemd/system/$SVC"
         rm -f "$CONF_DIR/${TARGET_ENV}.env"
         systemctl daemon-reload
@@ -474,6 +434,12 @@ purge_all() {
             systemctl disable --now "$SVC" 2>/dev/null || true
             rm -f "/etc/systemd/system/$SVC"
         done
+        
+        # --- نابود کردن تمام پروسه‌های جا مانده در RAM ---
+        pkill -9 -f "g2ray-worker.sh" 2>/dev/null || true
+        pkill -9 -f "g2ray-monitor.sh" 2>/dev/null || true
+        # ------------------------------------------------
+        
         rm -rf /etc/g2ray-monitor/*
         systemctl daemon-reload
         echo -e "${GREEN}System completely purged!${NC}"
@@ -483,13 +449,6 @@ purge_all() {
         echo -e "${GREEN}Aborted.${NC}"
         sleep 1; menu_settings
     fi
-}
-
-run_tests() {
-    echo -e "\n${CYAN}Running Diagnostics...${NC}"
-    ping -c 1 8.8.8.8 >/dev/null 2>&1 && echo -e "Internet: ${GREEN}OK${NC}" || echo -e "Internet: ${RED}Fail${NC}"
-    curl -s -m 3 https://api.telegram.org >/dev/null && echo -e "Telegram API: ${GREEN}Reachable${NC}" || echo -e "Telegram API: ${RED}Blocked${NC}"
-    curl -s -m 3 https://tapi.bale.ai >/dev/null && echo -e "Bale API: ${GREEN}Reachable${NC}" || echo -e "Bale API: ${RED}Blocked${NC}"
 }
 
 # START APP
